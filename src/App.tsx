@@ -1,10 +1,10 @@
 import './App.css'
-import CartPage from './pages/CartPage'
+import PostCreatePage from './pages/PostCreatePage'
 
 export default function Home() {
   return (
     <div>
-      <CartPage />
+      <PostCreatePage />
     </div>
   )
 }
