@@ -2,39 +2,76 @@ import React, { useState } from "react";
 
 export default function MediaUpload({ onMediaSelect }) {
   const [error, setError] = useState("");
-  
+
   const validateFile = (file) => {
-    // Dosya boyutu kontrolü (örn: 5MB)
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
       throw new Error("Dosya boyutu 5MB'dan büyük olamaz");
     }
 
-    // Dosya tipi kontrolü
-    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp'];
     const allowedVideoTypes = ['video/mp4', 'video/webm'];
     
     if (!allowedImageTypes.includes(file.type) && !allowedVideoTypes.includes(file.type)) {
-      throw new Error("Sadece JPEG, PNG, GIF, WEBP, MP4 ve WEBM dosyaları yüklenebilir");
+      throw new Error("Sadece JPEG, PNG, WEBP, MP4 ve WEBM dosyaları yüklenebilir");
+    }
+
+    const dangerousExtensions = ['.exe', '.bat', '.cmd', '.msi', '.js', '.php'];
+    if (dangerousExtensions.some(ext => file.name.toLowerCase().endsWith(ext))) {
+      throw new Error("Zararlı dosya tespit edildi");
+    }
+
+    const cleanFileName = file.name.replace(/[^a-zA-Z0-9-_\.]/g, '_');
+    if (cleanFileName !== file.name) {
+      throw new Error("Dosya adı sadece harf, rakam ve (-_.) karakterlerini içerebilir");
     }
   };
 
   const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
     try {
       setError("");
+      const file = e.target.files[0];
+      if (!file) return;
+
       validateFile(file);
+
+      const actualType = file.type;
+      const reader = new FileReader();
       
-      // Dosya adını temizle ve yeniden adlandır
-      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
-      const renamedFile = new File([file], cleanFileName, { type: file.type });
-      
-      onMediaSelect(renamedFile);
+      reader.onload = () => {
+        try {
+          // Magic number kontrolü
+          const arr = new Uint8Array(reader.result).subarray(0, 4);
+          const header = Array.from(arr).map(b => b.toString(16)).join('');
+          
+          // JPEG, PNG, MP4 magic number kontrolü
+          const magicNumbers = {
+            'image/jpeg': 'ffd8',
+            'image/png': '89504e47',
+            'video/mp4': '66747970'
+          };
+
+          if (magicNumbers[actualType] && !header.startsWith(magicNumbers[actualType])) {
+            throw new Error("Dosya içeriği geçersiz");
+          }
+
+          onMediaSelect(new File([file], cleanFileName, { type: file.type }));
+        } catch (err) {
+          setError(err.message);
+          e.target.value = '';
+        }
+      };
+
+      reader.onerror = () => {
+        setError("Dosya okunamadı");
+        e.target.value = '';
+      };
+
+      reader.readAsArrayBuffer(file.slice(0, 4));
+
     } catch (err) {
       setError(err.message);
-      e.target.value = ''; // Input'u temizle
+      e.target.value = '';
     }
   };
 
@@ -65,9 +102,7 @@ export default function MediaUpload({ onMediaSelect }) {
         </label>
       </div>
 
-      {error && (
-        <p className="text-red-500 text-sm mt-2">{error}</p>
-      )}
+      {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
     </div>
   );
 }

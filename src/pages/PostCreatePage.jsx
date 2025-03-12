@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MediaUpload from "../components/MediaUpload";
 import PostDetails from "../components/PostDetails";
 import PostPreview from "../components/PostPreview";
@@ -14,12 +14,30 @@ export default function PostCreatePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleMediaSelect = (file) => {
-    setFormData(prev => ({
-      ...prev,
-      mediaFile: file,
-      mediaPreview: URL.createObjectURL(file)
-    }));
+    try {
+      // Önceki URL'i temizle
+      if (formData.mediaPreview instanceof Blob) {
+        URL.revokeObjectURL(formData.mediaPreview);
+      }
+
+      setFormData(prev => ({
+        ...prev,
+        mediaFile: file,
+        mediaPreview: file // Direkt file'ı gönderiyoruz, URL dönüşümü PostPreview'da yapılacak
+      }));
+    } catch (error) {
+      console.error('Media selection error:', error);
+    }
   };
+
+  // Memory leak'i önlemek için cleanup
+  useEffect(() => {
+    return () => {
+      if (formData.mediaPreview instanceof Blob) {
+        URL.revokeObjectURL(URL.createObjectURL(formData.mediaPreview));
+      }
+    };
+  }, [formData.mediaPreview]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
